@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Трекер здоров'я</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        .input-section {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            flex: 1 1 45%;
+            min-width: 300px;
+        }
+        canvas {
+            margin: 20px auto;
+            display: block;
+            max-width: 95%;
+        }
+    </style>
+</head>
+<body>
+    <h1>Трекер здоров'я</h1>
+    <div class="input-section">
+        <!-- Вага -->
+        <div class="input-group">
+            <h2>Вага</h2>
+            <input type="number" id="weight" placeholder="Введіть вагу (кг)">
+        </div>
+        <!-- Тиск і пульс -->
+        <div class="input-group">
+            <h2>Тиск і пульс</h2>
+            <h3>Ранок</h3>
+            <input type="number" id="morningSystolic" placeholder="Систолічний (верхній) тиск">
+            <input type="number" id="morningDiastolic" placeholder="Діастолічний (нижній) тиск">
+            <input type="number" id="morningPulse" placeholder="Пульс">
+            <h3>Вечір</h3>
+            <input type="number" id="eveningSystolic" placeholder="Систолічний (верхній) тиск">
+            <input type="number" id="eveningDiastolic" placeholder="Діастолічний (нижній) тиск">
+            <input type="number" id="eveningPulse" placeholder="Пульс">
+        </div>
+    </div>
+    <button onclick="saveData()">Зберегти</button>
+
+    <!-- Графіки -->
+    <div>
+        <h2>Графік ваги</h2>
+        <canvas id="weightChart"></canvas>
+    </div>
+    <div>
+        <h2>Графік тиску та пульсу</h2>
+        <canvas id="pressureChart"></canvas>
+    </div>
+
+    <script>
+        let weightData = JSON.parse(localStorage.getItem('weightData')) || [];
+        let pressureData = JSON.parse(localStorage.getItem('pressureData')) || [];
+
+        const today = new Date().toISOString().split('T')[0];
+
+        function saveData() {
+            const weight = parseFloat(document.getElementById('weight').value);
+            if (weight) {
+                weightData.push({ date: today, weight });
+                localStorage.setItem('weightData', JSON.stringify(weightData));
+            }
+
+            const morningSystolic = parseInt(document.getElementById('morningSystolic').value);
+            const morningDiastolic = parseInt(document.getElementById('morningDiastolic').value);
+            const morningPulse = parseInt(document.getElementById('morningPulse').value);
+
+            const eveningSystolic = parseInt(document.getElementById('eveningSystolic').value);
+            const eveningDiastolic = parseInt(document.getElementById('eveningDiastolic').value);
+            const eveningPulse = parseInt(document.getElementById('eveningPulse').value);
+
+            if (morningSystolic && morningDiastolic && morningPulse) {
+                let existingEntry = pressureData.find(d => d.date === today);
+                if (existingEntry) {
+                    existingEntry.morning = {
+                        systolic: morningSystolic,
+                        diastolic: morningDiastolic,
+                        pulse: morningPulse
+                    };
+                } else {
+                    pressureData.push({
+                        date: today,
+                        morning: {
+                            systolic: morningSystolic,
+                            diastolic: morningDiastolic,
+                            pulse: morningPulse
+                        },
+                        evening: null
+                    });
+                }
+            }
+
+            if (eveningSystolic && eveningDiastolic && eveningPulse) {
+                let existingEntry = pressureData.find(d => d.date === today);
+                if (existingEntry) {
+                    existingEntry.evening = {
+                        systolic: eveningSystolic,
+                        diastolic: eveningDiastolic,
+                        pulse: eveningPulse
+                    };
+                } else {
+                    pressureData.push({
+                        date: today,
+                        morning: null,
+                        evening: {
+                            systolic: eveningSystolic,
+                            diastolic: eveningDiastolic,
+                            pulse: eveningPulse
+                        }
+                    });
+                }
+            }
+
+            localStorage.setItem('pressureData', JSON.stringify(pressureData));
+            updateCharts();
+        }
+
+        function updateCharts() {
+            // Графік ваги
+            const weightCtx = document.getElementById('weightChart').getContext('2d');
+            new Chart(weightCtx, {
+                type: 'line',
+                data: {
+                    labels: weightData.map(d => d.date),
+                    datasets: [{
+                        label: 'Вага (кг)',
+                        data: weightData.map(d => d.weight),
+                        borderColor: 'blue',
+                        fill: false
+                    }]
+                },
+                options: { responsive: true }
+            });
+
+            // Графік тиску та пульсу
+            const pressureCtx = document.getElementById('pressureChart').getContext('2d');
+            new Chart(pressureCtx, {
+                type: 'line',
+                data: {
+                    labels: pressureData.map(d => d.date),
+                    datasets: [
+                        {
+                            label: 'Ранковий систолічний тиск',
+                            data: pressureData.map(d => d.morning ? d.morning.systolic : null),
+                            borderColor: 'green',
+                            fill: false
+                        },
+                        {
+                            label: 'Ранковий діастолічний тиск',
+                            data: pressureData.map(d => d.morning ? d.morning.diastolic : null),
+                            borderColor: 'lightgreen',
+                            fill: false
+                        },
+                        {
+                            label: 'Вечірній систолічний тиск',
+                            data: pressureData.map(d => d.evening ? d.evening.systolic : null),
+                            borderColor: 'red',
+                            fill: false
+                        },
+                        {
+                            label: 'Вечірній діастолічний тиск',
+                            data: pressureData.map(d => d.evening ? d.evening.diastolic : null),
+                            borderColor: 'pink',
+                            fill: false
+                        },
+                        {
+                            label: 'Ранковий пульс',
+                            data: pressureData.map(d => d.morning ? d.morning.pulse : null),
+                            borderColor: 'blue',
+                            fill: false
+                        },
+                        {
+                            label: 'Вечірній пульс',
+                            data: pressureData.map(d => d.evening ? d.evening.pulse : null),
+                            borderColor: 'orange',
+                            fill: false
+                        }
+                    ]
+                },
+                options: { responsive: true }
+            });
+        }
+
+        updateCharts();
+    </script>
+</body>
+</html>
